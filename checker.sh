@@ -29,10 +29,10 @@ echo $(date '+%Y-%m-%d %H:%M:%S') - Работаем: $URL
 wget -qO "$HTML_FILE" "$URL"
 
 # Парсим
-IDS=$(xmllint --noout --html --xpath "$IDS_PATTERN" "$HTML_FILE" | grep -o '[0-9]*')
-TITLES=$(xmllint --noout --html --xpath "$TITLES_PATTERN" "$HTML_FILE" | iconv -s -f utf-8 -t iso-8859-1)
-PRICES=$(xmllint --noout --html --xpath "$PRICES_PATTERN" "$HTML_FILE" | iconv -s -f utf-8 -t iso-8859-1)
-PREVIEWS=$(xmllint --noout --html --xpath "$PREVIEWS_PATTERN" "$HTML_FILE" | grep -o 'http[^"]*')
+IDS=$(xmllint --noout --html --xpath "$IDS_PATTERN" "$HTML_FILE" 2> /dev/null | grep -o '[0-9]*')
+TITLES=$(xmllint --noout --html --xpath "$TITLES_PATTERN" "$HTML_FILE" 2> /dev/null | iconv -s -f utf-8 -t iso-8859-1)
+PRICES=$(xmllint --noout --html --xpath "$PRICES_PATTERN" "$HTML_FILE" 2> /dev/null | iconv -s -f utf-8 -t iso-8859-1)
+PREVIEWS=$(xmllint --noout --html --xpath "$PREVIEWS_PATTERN" "$HTML_FILE" 2> /dev/null | grep -o 'http[^"]*')
 
 # Проверяем количество ID отправленных объявлений - если > 100, то оставляем только первые 100
 if [ ! -f $LAST_SENT_IDS_FILE ]; then
