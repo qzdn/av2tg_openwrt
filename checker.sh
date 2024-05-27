@@ -9,7 +9,6 @@
 
 # Настройки
 FOLDER="/root/checker/"
-HTML_FILE="$FOLDER/search_results.html"
 LAST_SENT_IDS_FILE="$FOLDER/last_sent_ids.txt"
 URL=$(echo $(cat $FOLDER/link.txt))
 CHAT_ID=$(echo $(cat $FOLDER/chat_id.txt))
@@ -26,13 +25,13 @@ PREVIEWS_PATTERN="//div[@itemtype=\"http://schema.org/Product\"]//img/@src"
 echo $(date '+%Y-%m-%d %H:%M:%S') - Работаем: $URL
 
 # Скачиваем страницу
-wget -qO "$HTML_FILE" "$URL"
+CONTENT=$(wget -qO- "$URL")
 
 # Парсим
-IDS=$(xmllint --noout --html --xpath "$IDS_PATTERN" "$HTML_FILE" 2> /dev/null | grep -o '[0-9]*')
-TITLES=$(xmllint --noout --html --xpath "$TITLES_PATTERN" "$HTML_FILE" 2> /dev/null | iconv -s -f utf-8 -t iso-8859-1)
-PRICES=$(xmllint --noout --html --xpath "$PRICES_PATTERN" "$HTML_FILE" 2> /dev/null | iconv -s -f utf-8 -t iso-8859-1)
-PREVIEWS=$(xmllint --noout --html --xpath "$PREVIEWS_PATTERN" "$HTML_FILE" 2> /dev/null | grep -o 'http[^"]*')
+IDS=$(echo "$CONTENT" | xmllint --noout --html --xpath "$IDS_PATTERN" - 2> /dev/null | grep -o '[0-9]*')
+TITLES=$(echo "$CONTENT" | xmllint --noout --html --xpath "$TITLES_PATTERN" - 2> /dev/null | iconv -s -f utf-8 -t iso-8859-1)
+PRICES=$(echo "$CONTENT" | xmllint --noout --html --xpath "$PRICES_PATTERN" - 2> /dev/null | iconv -s -f utf-8 -t iso-8859-1)
+PREVIEWS=$(echo "$CONTENT" | xmllint --noout --html --xpath "$PREVIEWS_PATTERN" - 2> /dev/null | grep -o 'http[^"]*')
 
 # Проверяем количество ID отправленных объявлений - если > 100, то оставляем только первые 100
 if [ ! -f $LAST_SENT_IDS_FILE ]; then
