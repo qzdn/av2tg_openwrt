@@ -41,3 +41,7 @@ $ chmod +x checker.sh
 ### Cron:
 
 `*/5 * * * * /root/checker/checker.sh > /root/checker/messages.log 2>&1 &`
+
+## TODO
+
+Избавиться от зависимостей полностью, переписав парсинг на `awk`, `grep`, `sed`, etc...
