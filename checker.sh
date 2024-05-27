@@ -55,13 +55,13 @@ while IFS= read -r id || [[ -n "$id" ]]; do
     read -r -u 4 price
     read -r -u 5 preview
 
-    MESSAGE_TEXT="<b>$title</b>%0A$price%0A---%0A<a href=\"https://avito.ru/$id\">https://avito.ru/$id</a>"
-
     if grep -qxF "$id" $LAST_SENT_IDS_FILE; then
       echo "$(date '+%Y-%m-%d %H:%M:%S') - Объявление $id уже отправляли, пропускаем..."
       continue
     fi
 
+    MESSAGE_TEXT="<b>$title</b>%0A$price%0A---%0A<a href=\"https://avito.ru/$id\">https://avito.ru/$id</a>"
+    
     if [[ -z "$preview" ]]; then
       echo "$(date '+%Y-%m-%d %H:%M:%S') - Отправляем объявление: $title за $price ["https://avito.ru/$id"]"
       LINK="https://api.telegram.org/bot$BOT_TOKEN/sendMessage?chat_id=$CHAT_ID&text=$MESSAGE_TEXT&parse_mode=html"
