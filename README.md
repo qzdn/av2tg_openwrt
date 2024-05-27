@@ -3,7 +3,7 @@
 ### Пакеты
 
 ```sh
-$ opkg update && opkg install xmllint iconv
+$ opkg update && opkg install libxml2-utils iconv
 ```
 
 ### link
