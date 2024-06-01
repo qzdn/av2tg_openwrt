@@ -75,12 +75,10 @@ while IFS= read -r id || [[ -n "$id" ]]; do
     
     if [[ -z "$preview" ]]; then
       LINK="https://api.telegram.org/bot$BOT_TOKEN/sendMessage?chat_id=$CHAT_ID&text=$MESSAGE_TEXT&parse_mode=html"
-      echo "$LINK"
       wget -qO /dev/null "$LINK"
       echo "$(date '+%Y-%m-%d %H:%M:%S') - Отправил объявление: $title за $price ["https://avito.ru/$id"]"
     else
-      LINK="https://api.telegram.org/bot$BOT_TOKEN/sendPhoto?chat_id=$CHAT_ID&photo=$preview&caption=$MESSAGE_TEXT&parse_mode=html"
-      echo "$LINK"
+      LINK="https://api.telegram.org/bot$BOT_TOKEN/sendPhoto?chat_id=$CHAT_ID&photo=$preview?a&caption=$MESSAGE_TEXT&parse_mode=html"
       wget -qO /dev/null "$LINK"
       echo "$(date '+%Y-%m-%d %H:%M:%S') - Отправил объявление: $title за $price ["https://avito.ru/$id"]"
     fi
