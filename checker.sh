@@ -1,24 +1,23 @@
 #!/bin/sh
 
-# Необходимые пакеты: 
-# - wget (по умолчанию установлен uclient-fetch - его должно быть достаточно) 
-# - xmllint (парсер)
-# - iconv (правит сломанную кодировку кириллицы)
-#
-# opkg update && opkg install xmllint iconv
-
 # Настройки
-FOLDER="/root/checker/"
+FOLDER="/root/checker"
 LAST_SENT_IDS_FILE="$FOLDER/last_sent_ids.txt"
 URL=$(echo $(cat $FOLDER/link.txt))
 CHAT_ID=$(echo $(cat $FOLDER/chat_id.txt))
 BOT_TOKEN=$(echo $(cat $FOLDER/bot_token.txt))
 
 # XPath паттерны
-IDS_PATTERN="//div[@itemtype=\"http://schema.org/Product\"]/@data-marker"
-TITLES_PATTERN="//div[@itemtype=\"http://schema.org/Product\"]//div[@data-marker=\"leftChildrenVerticalContainer\"]/div/text()"
-PRICES_PATTERN="//div[@itemtype=\"http://schema.org/Product\"]//div[@data-marker=\"priceLabelList\"]/span/text()"
-PREVIEWS_PATTERN="//div[@itemtype=\"http://schema.org/Product\"]//img/@src"
+# Иногда отдаётся страничка с другой разметкой, поэтому вариантов несколько
+IDS_PATTERN='//div[@itemtype="http://schema.org/Product"]/@data-marker'
+
+TITLES_PATTERN='//div[@data-marker="leftChildrenVerticalContainer"]/div/text()'
+TITLES_PATTERN_ALT='//p[@data-marker="item/title"]/span/text()'
+
+PRICES_PATTERN='//div[@data-marker="priceLabelList"]/span/text()'
+PRICES_PATTERN_ALT='//div[@itemprop="offers"]/div[@itemprop="price"]/text()'
+
+PREVIEWS_PATTERN='//div[@itemtype="http://schema.org/Product"]//img/@src'
 
 # -------------------------------------------------------------------------
 
@@ -29,8 +28,19 @@ CONTENT=$(wget -qO- "$URL")
 
 # Парсим
 IDS=$(echo "$CONTENT" | xmllint --noout --html --xpath "$IDS_PATTERN" - 2> /dev/null | grep -o '[0-9]*')
-TITLES=$(echo "$CONTENT" | xmllint --noout --html --xpath "$TITLES_PATTERN" - 2> /dev/null | iconv -s -f utf-8 -t iso-8859-1)
+
+TITLES=$(echo "$CONTENT" | xmllint --noout --html --xpath "$TITLES_PATTERN" - 2> /dev/null | iconv -s -f utf-8 -t iso-8859-1 | sed 's/</%3C/g; s/#/%23/g; s/>/%3E/g; s/&/%26/g') # html escape
+if [ -z "$TITLES" ]; then
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - Авито отдал другую разметку, пробую другой XPath паттерн для названий..."
+    TITLES=$(echo "$CONTENT" | xmllint --noout --html --xpath "$TITLES_PATTERN_ALT" - 2> /dev/null | iconv -s -f utf-8 -t iso-8859-1 | sed 's/</%3C/g; s/#/%23/g; s/>/%3E/g; s/&/%26/g') # html escape
+fi
+
 PRICES=$(echo "$CONTENT" | xmllint --noout --html --xpath "$PRICES_PATTERN" - 2> /dev/null | iconv -s -f utf-8 -t iso-8859-1)
+if [ -z "$PRICES" ]; then
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - Авито отдал другую разметку, пробую другой XPath паттерн для цен..."
+    PRICES=$(echo "$CONTENT" | xmllint --noout --html --xpath "$PRICES_PATTERN_ALT" - 2> /dev/null | iconv -s -f utf-8 -t iso-8859-1)
+fi
+
 PREVIEWS=$(echo "$CONTENT" | xmllint --noout --html --xpath "$PREVIEWS_PATTERN" - 2> /dev/null | grep -o 'http[^"]*')
 
 # Проверяем количество ID отправленных объявлений - если > 100, то оставляем только первые 100
@@ -46,6 +56,7 @@ else
     fi
 fi
 
+# Отправляем
 exec 3< <(echo "$TITLES")
 exec 4< <(echo "$PRICES")
 exec 5< <(echo "$PREVIEWS")
@@ -60,16 +71,18 @@ while IFS= read -r id || [[ -n "$id" ]]; do
       continue
     fi
 
-    MESSAGE_TEXT="<b>$title</b>%0A$price%0A---%0A<a href=\"https://avito.ru/$id\">https://avito.ru/$id</a>"
+    MESSAGE_TEXT="<b>$title</b>%0A$price%0A—————%0A<a href=%22https://avito.ru/$id%22>https://avito.ru/$id</a>"
     
     if [[ -z "$preview" ]]; then
-      echo "$(date '+%Y-%m-%d %H:%M:%S') - Отправляем объявление: $title за $price ["https://avito.ru/$id"]"
       LINK="https://api.telegram.org/bot$BOT_TOKEN/sendMessage?chat_id=$CHAT_ID&text=$MESSAGE_TEXT&parse_mode=html"
-      wget -q -O /dev/null "$LINK"
+      echo "$LINK"
+      wget -qO /dev/null "$LINK"
+      echo "$(date '+%Y-%m-%d %H:%M:%S') - Отправил объявление: $title за $price ["https://avito.ru/$id"]"
     else
-      echo "$(date '+%Y-%m-%d %H:%M:%S') - Отправляем объявление: $title за $price ["https://avito.ru/$id"]"
       LINK="https://api.telegram.org/bot$BOT_TOKEN/sendPhoto?chat_id=$CHAT_ID&photo=$preview&caption=$MESSAGE_TEXT&parse_mode=html"
-      wget -q -O /dev/null "$LINK"
+      echo "$LINK"
+      wget -qO /dev/null "$LINK"
+      echo "$(date '+%Y-%m-%d %H:%M:%S') - Отправил объявление: $title за $price ["https://avito.ru/$id"]"
     fi
 
     echo "$id" >> $LAST_SENT_IDS_FILE
