@@ -12,10 +12,12 @@ BOT_TOKEN=$(echo $(cat $FOLDER/bot_token.txt))
 IDS_PATTERN='//div[@itemtype="http://schema.org/Product"]/@data-marker'
 
 TITLES_PATTERN='//div[@data-marker="leftChildrenVerticalContainer"]/div/text()'
-TITLES_PATTERN_ALT='//p[@data-marker="item/title"]/span/text()'
+TITLES_PATTERN_TWO='//p[@data-marker="item/title"]/span/text()'
+TITLES_PATTERN_THREE='//div[@data-marker="mainVerticalContainerLeft"]/div/div/text()'
 
 PRICES_PATTERN='//div[@data-marker="priceLabelList"]/span/text()'
-PRICES_PATTERN_ALT='//div[@itemprop="offers"]/div[@itemprop="price"]/text()'
+PRICES_PATTERN_TWO='//div[@itemprop="offers"]/div[@itemprop="price"]/text()'
+PRICES_PATTERN_THREE='//div[@data-marker="priceFlexContainerGrid"]/div/text()'
 
 PREVIEWS_PATTERN='//div[@itemtype="http://schema.org/Product"]//img/@src'
 
@@ -27,20 +29,40 @@ echo $(date '+%Y-%m-%d %H:%M:%S') - Работаем: $URL
 CONTENT=$(wget -qO- "$URL")
 
 # Парсим
+# ID
 IDS=$(echo "$CONTENT" | xmllint --noout --html --xpath "$IDS_PATTERN" - 2> /dev/null | grep -o '[0-9]*')
 
+# Названия
+echo "$(date '+%Y-%m-%d %H:%M:%S') - пробую первый XPath паттерн для названий..."
 TITLES=$(echo "$CONTENT" | xmllint --noout --html --xpath "$TITLES_PATTERN" - 2> /dev/null | iconv -s -f utf-8 -t iso-8859-1 | sed 's/</%3C/g; s/#/%23/g; s/>/%3E/g; s/&/%26/g') # html escape
+#echo "$TITLES"
 if [ -z "$TITLES" ]; then
-    echo "$(date '+%Y-%m-%d %H:%M:%S') - Авито отдал другую разметку, пробую другой XPath паттерн для названий..."
-    TITLES=$(echo "$CONTENT" | xmllint --noout --html --xpath "$TITLES_PATTERN_ALT" - 2> /dev/null | iconv -s -f utf-8 -t iso-8859-1 | sed 's/</%3C/g; s/#/%23/g; s/>/%3E/g; s/&/%26/g') # html escape
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - пробую второй XPath паттерн для названий..."
+    TITLES=$(echo "$CONTENT" | xmllint --noout --html --xpath "$TITLES_PATTERN_TWO" - 2> /dev/null | iconv -s -f utf-8 -t iso-8859-1 | sed 's/</%3C/g; s/#/%23/g; s/>/%3E/g; s/&/%26/g') # html escape
+    #echo "$TITLES"
+fi
+if [ -z "$TITLES" ]; then
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - пробую третий XPath паттерн для названий..."
+    TITLES=$(echo "$CONTENT" | xmllint --noout --html --xpath "$TITLES_PATTERN_THREE" - 2> /dev/null | iconv -s -f utf-8 -t iso-8859-1 | sed 's/</%3C/g; s/#/%23/g; s/>/%3E/g; s/&/%26/g') # html escape
+    #echo "$TITLES"
 fi
 
+# Цены
+echo "$(date '+%Y-%m-%d %H:%M:%S') - пробую первый XPath паттерн для цен..."
 PRICES=$(echo "$CONTENT" | xmllint --noout --html --xpath "$PRICES_PATTERN" - 2> /dev/null | iconv -s -f utf-8 -t iso-8859-1)
+echo "$PRICES"
 if [ -z "$PRICES" ]; then
-    echo "$(date '+%Y-%m-%d %H:%M:%S') - Авито отдал другую разметку, пробую другой XPath паттерн для цен..."
-    PRICES=$(echo "$CONTENT" | xmllint --noout --html --xpath "$PRICES_PATTERN_ALT" - 2> /dev/null | iconv -s -f utf-8 -t iso-8859-1)
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - пробую второй XPath паттерн для цен..."
+    PRICES=$(echo "$CONTENT" | xmllint --noout --html --xpath "$PRICES_PATTERN_TWO" - 2> /dev/null | iconv -s -f utf-8 -t iso-8859-1)
+    #echo "$PRICES"
+fi
+if [ -z "$PRICES" ]; then
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - пробую третий XPath паттерн для цен..."
+    PRICES=$(echo "$CONTENT" | xmllint --noout --html --xpath "$PRICES_PATTERN_THREE" - 2> /dev/null | iconv -s -f utf-8 -t iso-8859-1)
+    #echo "$PRICES"
 fi
 
+# Картинки
 PREVIEWS=$(echo "$CONTENT" | xmllint --noout --html --xpath "$PREVIEWS_PATTERN" - 2> /dev/null | grep -o 'http[^"]*')
 
 # Проверяем количество ID отправленных объявлений - если > 100, то оставляем только первые 100

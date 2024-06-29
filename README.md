@@ -6,12 +6,17 @@
 $ opkg update && opkg install libxml2-utils iconv
 ```
 
-### link
+### checher.sh
 
-Настройте параметры поиска **_в мобильной версии сайта_**, установите сортировку "По дате" и вставьте ссылку в `link.txt`
+Положите файл в отдельно созданную директорию, например `/root/checker`. В самом файле укажите полный путь в строке `FOLDER="/root/checker"`.
 
-### chat_id
+### link.txt
 
+Настройте параметры поиска **_в мобильной версии сайта_**, установите сортировку "По дате" и вставьте ссылку в `link.txt`, который должен лежать рядом с `checker.sh`.
+
+### chat_id.txt
+
+Создайте `chat_id.txt` рядом с `checker.sh`.  
 [@JsonDumpBot](https://t.me/JsonDumpBot) > `chat_id.txt`
 
 ```json
@@ -28,8 +33,9 @@ $ opkg update && opkg install libxml2-utils iconv
 }
 ```
 
-### bot_token
+### bot_token.txt
 
+Создайте `bot_token.txt` рядом с `checker.sh`.  
 [@BotFather](https://t.me/BotFather) > `bot_token.txt`
 
 ### Права
@@ -41,7 +47,3 @@ $ chmod +x checker.sh
 ### Cron:
 
 `*/5 * * * * /root/checker/checker.sh > /root/checker/messages.log 2>&1 &`
-
-## TODO
-
-Избавиться от зависимостей полностью, переписав парсинг на `awk`, `grep`, `sed`, etc...
