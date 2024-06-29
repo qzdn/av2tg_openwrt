@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # Настройки
-FOLDER="/root/checker"
+FOLDER="$(echo $(pwd))"
 LAST_SENT_IDS_FILE="$FOLDER/last_sent_ids.txt"
 URL=$(echo $(cat $FOLDER/link.txt))
 CHAT_ID=$(echo $(cat $FOLDER/chat_id.txt))

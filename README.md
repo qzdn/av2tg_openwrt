@@ -8,7 +8,7 @@ $ opkg update && opkg install libxml2-utils iconv
 
 ### checher.sh
 
-Положите файл в отдельно созданную директорию, например `/root/checker`. В самом файле укажите полный путь в строке `FOLDER="/root/checker"`.
+Положите файл в отдельно созданную директорию, например `/root/checker`.
 
 ### link.txt
 
