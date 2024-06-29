@@ -50,7 +50,7 @@ fi
 # Цены
 echo "$(date '+%Y-%m-%d %H:%M:%S') - пробую первый XPath паттерн для цен..."
 PRICES=$(echo "$CONTENT" | xmllint --noout --html --xpath "$PRICES_PATTERN" - 2> /dev/null | iconv -s -f utf-8 -t iso-8859-1)
-echo "$PRICES"
+#echo "$PRICES"
 if [ -z "$PRICES" ]; then
     echo "$(date '+%Y-%m-%d %H:%M:%S') - пробую второй XPath паттерн для цен..."
     PRICES=$(echo "$CONTENT" | xmllint --noout --html --xpath "$PRICES_PATTERN_TWO" - 2> /dev/null | iconv -s -f utf-8 -t iso-8859-1)
