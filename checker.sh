@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # Настройки
-FOLDER="/root/checker"
+FOLDER="/root/av2tg_openwrt"
 LAST_SENT_IDS_FILE="$FOLDER/last_sent_ids.txt"
 URL=$(echo $(cat $FOLDER/link.txt))
 CHAT_ID=$(echo $(cat $FOLDER/chat_id.txt))
@@ -19,7 +19,7 @@ PRICES_PATTERN='//div[@data-marker="priceLabelList"]/span/text()'
 PRICES_PATTERN_TWO='//div[@itemprop="offers"]/div[@itemprop="price"]/text()'
 PRICES_PATTERN_THREE='//div[@data-marker="priceFlexContainerGrid"]/div/text()'
 
-PREVIEWS_PATTERN='//div[@itemtype="http://schema.org/Product"]//img/@src'
+PREVIEWS_PATTERN='//div[@itemtype="http://schema.org/Product"]//img/@srcset'
 
 # -------------------------------------------------------------------------
 
@@ -31,6 +31,7 @@ CONTENT=$(wget -qO- "$URL")
 # Парсим
 # ID
 IDS=$(echo "$CONTENT" | xmllint --noout --html --xpath "$IDS_PATTERN" - 2> /dev/null | grep -o '[0-9]*')
+#echo "$IDS"
 
 # Названия
 echo "$(date '+%Y-%m-%d %H:%M:%S') - пробую первый XPath паттерн для названий..."
@@ -63,7 +64,9 @@ if [ -z "$PRICES" ]; then
 fi
 
 # Картинки
-PREVIEWS=$(echo "$CONTENT" | xmllint --noout --html --xpath "$PREVIEWS_PATTERN" - 2> /dev/null | grep -o 'http[^"]*')
+echo "$(date '+%Y-%m-%d %H:%M:%S') - получаем превьюшки..." 
+PREVIEWS=$(echo "$CONTENT" | xmllint --noout --html --xpath "$PREVIEWS_PATTERN" - 2> /dev/null | grep -Eo '558w,\s*(https[^,]+)\s*678w' | sed 's/558w, //; s/ 678w//')
+#echo "$PREVIEWS"
 
 # Проверяем количество ID отправленных объявлений - если > 100, то оставляем только первые 100
 if [ ! -f $LAST_SENT_IDS_FILE ]; then
@@ -112,4 +115,3 @@ done < <(echo "$IDS")
 exec 3<&-
 exec 4<&-
 exec 5<&-
- 
