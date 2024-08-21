@@ -6,9 +6,9 @@
 $ opkg update && opkg install libxml2-utils iconv
 ```
 
-### checher.sh
+### checker.sh
 
-Положите файл в отдельно созданную директорию, например `/root/checker`. В самом файле укажите полный путь в строке `FOLDER="/root/checker"`.
+Положите файл в отдельно созданную директорию, например `/root/av2tg_openwrt`. В самом файле укажите полный путь в строке `FOLDER="/root/av2tg_openwrt"`.
 
 ### link.txt
 
@@ -46,4 +46,4 @@ $ chmod +x checker.sh
 
 ### Cron:
 
-`*/5 * * * * /root/checker/checker.sh > /root/checker/messages.log 2>&1 &`
+`*/5 * * * * /root/av2tg_openwrt/checker.sh > /root/av2tg_openwrt/messages.log 2>&1 &`
