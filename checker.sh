@@ -10,7 +10,7 @@ SENT_IDS_FILE="$FOLDER/sent_ids.txt"
 # XPath паттерны
 # Иногда отдаётся страничка с другой разметкой, поэтому вариантов несколько [25,30]
 IDS_PATTERN='//div[@itemtype="http://schema.org/Product"]/@data-marker'
-TITLES_PATTERN='//div[@data-marker="leftChildrenVerticalContainer"]/div[2]/text() | //div[@data-marker="mainVerticalContainerLeft"]/div[4]/div/text()'
+TITLES_PATTERN='//div[@data-marker="leftChildrenVerticalContainer"]/div/text() | //div[@data-marker="mainVerticalContainerLeft"]/div[4]/div/text()'
 PRICES_PATTERN='//div[@data-marker="priceLabelList"]/span/text() | //div[@data-marker="priceFlexContainerGrid"]/div[2]/text()'
 PREVIEWS_PATTERN='//div[@itemtype="http://schema.org/Product"]//img/@srcset'
 
