@@ -49,7 +49,7 @@ PREVIEWS_PATTERN="//img[@itemprop=\"image\"]/@srcset"
 get_digits() { grep -o "[0-9]*"; }
 fix_charset() { iconv -f utf-8 -t iso-8859-1; }
 xpath_parse() { echo "$1" | xmllint --noout --html --xpath "$2" - 2>/dev/null | fix_charset; }
-html_escape() { sed 's/ /%20/g; s/</%3C/g; s/>/%3E/g; s/&/%26/g; s/#/%23/g; s/"/%22/g; s/?/%3F/g; s/=/%3D/g; s/\./%2E/g; s/\:/$3A/g; '; }
+html_escape() { sed 's/ /%20/g; s/</%3C/g; s/>/%3E/g; s/&/%26/g; s/#/%23/g; s/"/%22/g; s/?/%3F/g; s/=/%3D/g; s/\./%2E/g; s/\:/%3A/g; '; }
 
 #####################################################################################
 
