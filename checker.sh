@@ -1,93 +1,127 @@
 #!/bin/sh
 
-# Настройки
-FOLDER="/root/av2tg_openwrt"
-BOT_TOKEN=$(cat "$FOLDER/bot_token.txt")
-CHAT_ID=$(cat "$FOLDER/chat_id.txt")
-URL=$(cat "$FOLDER/link.txt")
-SENT_IDS_FILE="$FOLDER/sent_ids.txt"
+#####################################################################################
+#                                                                                   #
+#   1. Настройки                                                                    #
+#   1.1. Установите пакеты: opkg update && opkg install libxml2-utils iconv         #    
+#   1.2. Положите скрипт в отдельную папку, например, /root/av2tg.                  #
+#   1.3. Положите рядом со скриптом файл настроек settings.txt, в котором:          #
+#   - на первой строке - chat_id (узнать можно у @JsonDumpBot)                      #
+#   - на второй строке - bot_token (@BotFather)                                     #
+#   - на третьей строке - url настроенного поиска (https://avito.ru/moscow/...)     #                                                                                                      #
+#   Пример:                                                                         #
+#       123456                                                                      #
+#       1111111111:...                                                              #
+#       https://www.avito.ru/moskva/telefony/mobile-ASgBAgICAUSwwQ2I_Dc?f=AS...     #
+#                                                                                   #
+#   2. Выдайте права на запуск:                                                     #
+#       chmod +x checker.sh                                                         #
+#                                                                                   #
+#   3. Добавьте в cron:                                                             #
+#       */5 * * * * /root/av2tg/checker.sh > /root/av2tg/messages.log 2>&1 &        #
+#                                                                                   #
+#   Посмотреть, что случилось в процессе работы, можно в файле messages.log         #
+#   после запуска скрипта в cron, либо через ./checker.sh > messages.log 2>&1       #
+#                                                                                   #
+#####################################################################################
+
+# Пути к файлам
+WORKING_FOLDER=$(dirname "$0")
+SETTINGS_FILE="settings.txt"
+SENT_IDS_FILE="sent_ids.txt"
+
+cd "${WORKING_FOLDER}"
+[ -f "${SETTINGS_FILE}" ] || { echo "$(date "+%Y-%m-%d %H:%M:%S") - отсутствует файл настроек ${SETTINGS_FILE}"; exit 1; }
+
+# Читаем файл настроек
+SETTINGS=$(cat "${SETTINGS_FILE}")
+CHAT_ID=$(echo "${SETTINGS}" | sed -n "1p" | tr -d "\n\r")
+BOT_TOKEN=$(echo "${SETTINGS}" | sed -n "2p" | tr -d "\n\r")
+SEARCH_URL=$(echo "${SETTINGS}" | sed -n "3p" | tr -d "\n\r")
 
 # XPath паттерны
-# Иногда отдаётся страничка с другой разметкой, поэтому вариантов несколько [25,30]
-IDS_PATTERN='//div[@itemtype="http://schema.org/Product"]/@data-marker'
-TITLES_PATTERN='//div[@data-marker="leftChildrenVerticalContainer"]/div/text() | //div[@data-marker="mainVerticalContainerLeft"]/div[4]/div/text()'
-PRICES_PATTERN='//div[@data-marker="priceLabelList"]/span/text() | //div[@data-marker="priceFlexContainerGrid"]/div[2]/text()'
-PREVIEWS_PATTERN='//div[@itemtype="http://schema.org/Product"]//img/@srcset'
+ADS_PATTERN="//div[@data-marker=\"item\"]"
+IDS_PATTERN="//div[@data-marker=\"item\"]/@data-item-id"
+TITLES_PATTERN="//h3[@itemprop=\"name\"]/text()"
+PRICES_PATTERN="//meta[@itemprop=\"price\"]/@content"
+PREVIEWS_PATTERN="//img[@itemprop=\"image\"]/@srcset"
 
-xpath_parse() {
-    echo "$CONTENT" | xmllint --noout --html --xpath "$1" - 2>/dev/null
-}
+get_digits() { grep -o "[0-9]*"; }
+fix_charset() { iconv -f utf-8 -t iso-8859-1; }
+xpath_parse() { echo "$1" | xmllint --noout --html --xpath "$2" - 2>/dev/null | fix_charset; }
+html_escape() { sed 's/ /%20/g; s/</%3C/g; s/>/%3E/g; s/&/%26/g; s/#/%23/g; s/"/%22/g; s/?/%3F/g; s/=/%3D/g; s/\./%2E/g; s/\:/$3A/g; '; }
 
-fix_charset() {
-    cat | iconv -s -f utf-8 -t iso-8859-1
-}
-
-html_escape() {
-    # Почему API отдаёт 400, если в названии есть заглавная H (эйч) - загадка дыры.
-    cat | sed 's/</%3C/g; s/>/%3E/g; s/&/%26/g; s/#/%23/g; s/"/%22/g; s/H/%48/g'
-}
-
-# -------------------------------------------------------------------------
+#####################################################################################
 
 # Скачиваем страницу
-echo "$(date '+%Y-%m-%d %H:%M:%S') - скачивание $URL..."
-CONTENT=$(wget -qO- "$URL") || { echo "$(date '+%Y-%m-%d %H:%M:%S') - ошибка скачивания"; exit 1; }
+echo "$(date "+%Y-%m-%d %H:%M:%S") - скачивание ${SEARCH_URL}..."
+# Удаляем лишние переносы строк и пробелы
+CONTENT=$(wget -qO- "${SEARCH_URL}" | tr "\n" " ")
 
-# Парсинг
-echo "$(date '+%Y-%m-%d %H:%M:%S') - парсинг IDs..."
-IDS=$(xpath_parse "$IDS_PATTERN" | grep -o '[0-9]*')
+# Получаем объявления по отдельности
+echo "$(date "+%Y-%m-%d %H:%M:%S") - парсинг объявлений..."
+ADS=$(xpath_parse "${CONTENT}" "${ADS_PATTERN}")
 
-echo "$(date '+%Y-%m-%d %H:%M:%S') - парсинг названий..."
-TITLES=$(xpath_parse "$TITLES_PATTERN" | fix_charset | html_escape)
-
-echo "$(date '+%Y-%m-%d %H:%M:%S') - парсинг цен..."
-PRICES=$(xpath_parse "$PRICES_PATTERN" | fix_charset)
-
-echo "$(date '+%Y-%m-%d %H:%M:%S') - парсинг превью..."
-PREVIEWS=$(xpath_parse "$PREVIEWS_PATTERN" | grep -Eo '558w,\s(https[^,]+)\s678w' | sed 's/558w, //; s/ 678w//')
-
-# Проверяем и укорачиваем файл sent_ids.txt, если отправленных объявлений > 100
-if [ ! -f "$SENT_IDS_FILE" ]; then
-    echo "$(date '+%Y-%m-%d %H:%M:%S') - первый запуск, создание sent_ids.txt..."
-    touch "$SENT_IDS_FILE"
-else
-    LINE_COUNT=$(wc -l < "$SENT_IDS_FILE")
-    if [ "$LINE_COUNT" -gt 100 ]; then
-        echo "$(date '+%Y-%m-%d %H:%M:%S') - отправленных объявлений больше 100, укорачивание файла..."
-        START_LINE=$((LINE_COUNT - 100 + 1)) && sed -i "1,${START_LINE}d" "$SENT_IDS_FILE"
-    fi
+# Проверяем, нашли ли объявления
+if [ -z "${ADS}" ]; then
+    echo "$(date "+%Y-%m-%d %H:%M:%S") - объявления не найдены: блок от Авито, некорректная страница/адрес или что-то ещё :("
+    exit 1
 fi
 
-# Отправляем сообщения в Telegram
-exec 3< <(echo "$TITLES")
-exec 4< <(echo "$PRICES")
-exec 5< <(echo "$PREVIEWS")
+# Проверяем и укорачиваем файл sent_ids.txt, если отправленных объявлений > 200
+[ -f "${SENT_IDS_FILE}" ] || { echo "$(date "+%Y-%m-%d %H:%M:%S") - создание ${SENT_IDS_FILE}..."; touch "$SENT_IDS_FILE"; }
+LINE_COUNT=$(wc -l < "${SENT_IDS_FILE}")
+if [ "${LINE_COUNT}" -gt 200 ]; then
+    echo "$(date "+%Y-%m-%d %H:%M:%S") - отправленных объявлений больше 200, укорачиваем ${SENT_IDS_FILE}..."
+    sed -i "1,$((LINE_COUNT - 200 + 1))d" "${SENT_IDS_FILE}"
+fi
 
-while IFS= read -r id || [ -n "$id" ]; do
-    read -r -u 3 title
-    read -r -u 4 price
-    read -r -u 5 preview
+# Читаем отправленные ID
+SENT_IDS=$(cat "${SENT_IDS_FILE}")
 
-    if grep -qxF "$id" "$SENT_IDS_FILE"; then
-        echo "$(date '+%Y-%m-%d %H:%M:%S') - $id уже отправляли, пропускаем..."
+# Обработка объявлений
+echo "$ADS" | while read -r ad; do
+    if [ -z "${ad}" ]; then
+        echo "$(date "+%Y-%m-%d %H:%M:%S") - пустой элемент объявления, пропускаем..."
+        continue
+    fi
+    
+    ID=$(xpath_parse "${ad}" "${IDS_PATTERN}" | get_digits)
+    TITLE=$(xpath_parse "${ad}" "${TITLES_PATTERN}" | html_escape)
+    PRICE=$(xpath_parse "${ad}" "${PRICES_PATTERN}" | get_digits)
+    PREVIEW=$(xpath_parse "${ad}" "${PREVIEWS_PATTERN}" | sed -n "s/.*472w,\s*\(https[^,]*\)\s*636w.*/\1/p")
+
+    # Если значения пусты - пропускаем
+    if [ -z "${ID}" ] || [ -z "${TITLE}" ] || [ -z "${PRICE}" ]; then
+        echo "$(date "+%Y-%m-%d %H:%M:%S") - неполные данные для объявления, пропускаем..."
         continue
     fi
 
-    MESSAGE_TEXT="<b>$title</b>%0A$price%0A—————%0A<a href=%22https://avito.ru/$id%22>https://avito.ru/$id</a>"
-
-    if [ -z "$preview" ]; then
-        LINK="https://api.telegram.org/bot$BOT_TOKEN/sendMessage?chat_id=$CHAT_ID&text=$MESSAGE_TEXT&parse_mode=html"
-    else
-        LINK="https://api.telegram.org/bot$BOT_TOKEN/sendPhoto?chat_id=$CHAT_ID&photo=$preview?a&caption=$MESSAGE_TEXT&parse_mode=html"
+    # Проверка на пустые превью
+    if [ -z "${PREVIEW}" ]; then
+        PREVIEW="-" # Пустая строка для совпадения с другими элементами
     fi
 
-    echo "$(date '+%Y-%m-%d %H:%M:%S') - отправка $title за $price [https://avito.ru/$id]..."
-    wget -qO /dev/null "$LINK"
-    echo "$id" >> "$SENT_IDS_FILE"
+    # Формируем сообщение
+    MESSAGE_TEXT="<b>${TITLE}</b>%0A${PRICE}₽%0A—————%0A<a href=\"https://avito.ru/${ID}\">https://avito.ru/${ID}</a>"
+    
+    # Проверяем, отправляли ли уже это объявление
+    if echo "${SENT_IDS}" | grep -qxF "${ID}"; then
+        echo "$(date "+%Y-%m-%d %H:%M:%S") - ${ID} - ${TITLE} уже отправляли, пропускаем..."
+        continue
+    fi
 
-done < <(echo "$IDS")
+    # Формируем параметры для отправки
+    if [ "${PREVIEW}" != "-" ]; then
+        PARAMS="sendPhoto?chat_id=${CHAT_ID}&photo=${PREVIEW}&caption=${MESSAGE_TEXT}&parse_mode=html"
+    else
+        PARAMS="sendMessage?chat_id=${CHAT_ID}&text=${MESSAGE_TEXT}&parse_mode=html"
+    fi
 
-exec 3<&-
-exec 4<&-
-exec 5<&-
-
+    # Отправляем сообщение
+    echo "$(date "+%Y-%m-%d %H:%M:%S") - отправка ${TITLE} за ${PRICE}Р [https://avito.ru/${ID}]..."
+    wget -q -O /dev/null "https://api.telegram.org/bot${BOT_TOKEN}/${PARAMS}"   # https://core.telegram.org/bots/api#making-requests
+    
+    # Добавляем ID в файл
+    echo "$ID" >> "$SENT_IDS_FILE"
+done
