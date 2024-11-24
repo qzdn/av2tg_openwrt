@@ -40,6 +40,7 @@ BOT_TOKEN=$(echo "${SETTINGS}" | sed -n "2p" | tr -d "\n\r")
 SEARCH_URL=$(echo "${SETTINGS}" | sed -n "3p" | tr -d "\n\r")
 
 # XPath паттерны
+FIREWALL_PATTERN="//div[@class=\"firewall-container\"]"
 ADS_PATTERN="//div[@data-marker=\"item\"]"
 IDS_PATTERN="//div[@data-marker=\"item\"]/@data-item-id"
 TITLES_PATTERN="//h3[@itemprop=\"name\"]/text()"
@@ -53,18 +54,22 @@ html_escape() { sed 's/ /%20/g; s/</%3C/g; s/>/%3E/g; s/&/%26/g; s/#/%23/g; s/"/
 
 #####################################################################################
 
-# Скачиваем страницу
+# Скачиваем страницу, удаляем лишние переносы строк и пробелы
 echo "$(date "+%Y-%m-%d %H:%M:%S") - скачивание ${SEARCH_URL}..."
-# Удаляем лишние переносы строк и пробелы
-CONTENT=$(wget -qO- "${SEARCH_URL}" | tr "\n" " ")
+CONTENT=$(wget -U -qO- "${SEARCH_URL}" | tr "\n" " ")
 
-# Получаем объявления по отдельности
+# Проверяем на наличие бана
+is_blocked=$(xpath_parse "${CONTENT}" "${FIREWALL_PATTERN}")
+if [ -z "${is_blocked}" ]; then
+    echo "$(date "+%Y-%m-%d %H:%M:%S") - бан IP от Авито :("
+    exit 1
+fi
+
+# Получаем объявления по отдельности и проверяем
 echo "$(date "+%Y-%m-%d %H:%M:%S") - парсинг объявлений..."
 ADS=$(xpath_parse "${CONTENT}" "${ADS_PATTERN}")
-
-# Проверяем, нашли ли объявления
 if [ -z "${ADS}" ]; then
-    echo "$(date "+%Y-%m-%d %H:%M:%S") - объявления не найдены: блок от Авито, некорректная страница/адрес или что-то ещё :("
+    echo "$(date "+%Y-%m-%d %H:%M:%S") - объявления не найдены: некорректный адрес поиска, сменилась разметка или что-то ещё :("
     exit 1
 fi
 
@@ -76,10 +81,8 @@ if [ "${LINE_COUNT}" -gt 200 ]; then
     sed -i "1,$((LINE_COUNT - 200 + 1))d" "${SENT_IDS_FILE}"
 fi
 
-# Читаем отправленные ID
-SENT_IDS=$(cat "${SENT_IDS_FILE}")
-
 # Обработка объявлений
+SENT_IDS=$(cat "${SENT_IDS_FILE}")
 echo "$ADS" | while read -r ad; do
     if [ -z "${ad}" ]; then
         echo "$(date "+%Y-%m-%d %H:%M:%S") - пустой элемент объявления, пропускаем..."
