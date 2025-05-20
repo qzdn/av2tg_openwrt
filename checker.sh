@@ -35,7 +35,7 @@ SENT_IDS_FILE="sent_ids.txt"
 
 # XPath паттерны
 FIREWALL_PATTERN="//div[@class=\"firewall-container\"]"
-ADS_PATTERN="//div[@data-marker=\"item\"]"
+ADS_PATTERN="//div[@data-marker=\"item\" and not(ancestor::div[@data-marker=\"itemsCarousel\"])]"
 IDS_PATTERN="//div[@data-marker=\"item\"]/@data-item-id"
 TITLES_PATTERN="//a[@itemprop=\"url\"]/text()"
 PRICES_PATTERN="//meta[@itemprop=\"price\"]/@content"
