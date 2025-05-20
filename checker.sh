@@ -28,6 +28,8 @@
 #    */10 * * * * /root/av2tg/checker.sh > /root/av2tg/messages.log 2>&1 &    #
 ###############################################################################
 
+FIRST_RUN=0
+
 # Пути к файлам
 WORKING_FOLDER=$(dirname "$0")
 SETTINGS_FILE="settings.txt"
@@ -90,7 +92,7 @@ CONTENT=$(wget -U "${USER_AGENT}" --header="ft: ${FT_COOKIE}" -qO- "${SEARCH_URL
 
 # Проверяем, что ответ не пустой
 if [ -z "$CONTENT" ]; then
-    log "пустой ответ от Авито :("
+    log "пустой ответ от Авито, возможен блок (429)"
     exit 1
 fi
 
@@ -109,12 +111,21 @@ if [ -z "${ADS}" ]; then
     exit 1
 fi
 
-# Проверяем и укорачиваем файл sent_ids.txt, если отправленных объявлений > 200
-[ -f "${SENT_IDS_FILE}" ] || { log "создаю ${SENT_IDS_FILE}..."; touch "$SENT_IDS_FILE"; }
-LINE_COUNT=$(wc -l < "${SENT_IDS_FILE}")
-if [ "${LINE_COUNT}" -gt 200 ]; then
-    log "отправленных объявлений больше 200, укорачиваю ${SENT_IDS_FILE}..."
-    sed -i "1,$((LINE_COUNT - 200 + 1))d" "${SENT_IDS_FILE}"
+# Проверяем, что файл sent_ids.txt существует и он не пустой. 
+# Иначе считаем, что это первый запуск и создаём его.
+if [ ! -s "${SENT_IDS_FILE}" ]; then
+    log "первый запуск, создаю ${SENT_IDS_FILE}..."
+    touch "$SENT_IDS_FILE"
+    FIRST_RUN=1
+else
+    # Укорачиваем файл sent_ids.txt, если отправленных объявлений > 200
+    log "проверяю количество отправленных объявлений в ${SENT_IDS_FILE}..."
+    LINE_COUNT=$(wc -l < "${SENT_IDS_FILE}")
+    if [ "${LINE_COUNT}" -gt 200 ]; then
+        log "отправленных объявлений больше 200, укорачиваю ${SENT_IDS_FILE}..."
+        sed -i "1,$((LINE_COUNT - 200 + 1))d" "${SENT_IDS_FILE}"
+    fi
+    FIRST_RUN=0
 fi
 
 # Обработка объявлений
@@ -129,6 +140,13 @@ echo "$ADS" | while read -r ad; do
     TITLE=$(xpath_parse "${ad}" "${TITLES_PATTERN}" | fix_charset | html_escape)
     PRICE=$(xpath_parse "${ad}" "${PRICES_PATTERN}" | get_digits)
     PREVIEW=$(xpath_parse "${ad}" "${PREVIEWS_PATTERN}" | sed -n "s/.*472w,\s*\(https[^,]*\)\s*636w.*/\1/p")
+
+    # Если первый запуск - просто сохраняем айдишники в sent_ids.txt не отправляя
+    if [ "$FIRST_RUN" -eq 1 ]; then
+        log "сохраняю ${ID}..."
+        echo "$ID" >> "$SENT_IDS_FILE"
+        continue
+    fi
 
     # Проверяем, отправляли ли уже это объявление
     if echo "${SENT_IDS}" | grep -qxF "${ID}"; then
@@ -165,3 +183,10 @@ echo "$ADS" | while read -r ad; do
     # Добавляем ID в список отправленных
     echo "$ID" >> "$SENT_IDS_FILE"
 done
+
+# Сообщение, отправляемое при первом запуске
+if [ "$FIRST_RUN" -eq 1 ]; then
+    INIT_MSG=$(echo "Сохранил все объявления с первой страницы (${SEARCH_URL}), жду новых 😇" | html_escape)
+    wget -q -O /dev/null "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage?chat_id=${CHAT_ID}&text=${INIT_MSG}&parse_mode=html"
+    log "отправил приветственное сообщение"
+fi
