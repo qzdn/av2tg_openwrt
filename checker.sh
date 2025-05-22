@@ -3,7 +3,7 @@
 ###############################################################################
 #  1. Настройки                                                               #
 #    1.1. Установите пакеты:                                                  #
-#      opkg update && opkg install libxml2-utils iconv                        #
+#      opkg update && opkg install libxml2-utils                              #
 #    1.2. Положите скрипт в отдельную папку, например, /root/av2tg            #
 #    1.3. Положите рядом со скриптом файл настроек settings.txt:              #
 #      - На первой строке - chat_id (узнать можно у @JsonDumpBot)             #
@@ -47,9 +47,8 @@ USER_AGENT="Mozilla/5.0 (X11; Linux x86_64; rv:139.0) Gecko/20100101 Firefox/139
 
 log() { echo "$(date "+%Y-%m-%d %H:%M:%S") - $*"; }
 get_digits() { grep -o "[0-9]*"; }
-# xmllint почему-то ломает кодировку у кириллицы, исправляем
-fix_charset() { iconv -f utf-8 -t iso-8859-1; }
-xpath_parse() { echo "$1" | xmllint --noout --html --xpath "$2" - 2>/dev/null; }
+# xmllint почему-то ломает кодировку у кириллицы, исправляем костылём
+xpath_parse() { echo "$1" | sed '1i\<?xml version="1.0" encoding="UTF-8"?>' | xmllint --noout --html --xpath "$2" - 2>/dev/null; }
 html_escape() {
     sed -e 's/ /%20/g' -e 's/"/%22/g' -e 's/&/%26/g' -e "s/\'/%27/g" -e 's/</%3C/g' \
         -e 's/>/%3E/g' -e 's/?/%3F/g' -e 's/+/%2B/g' -e 's/\./%2E/g' -e 's/\//%2F/g' \
@@ -61,7 +60,7 @@ html_escape() {
 cd "$WORKING_FOLDER"
 
 # Проверка доступности утилит
-for cmd in xmllint iconv; do
+for cmd in xmllint; do
     if ! which "$cmd" >/dev/null 2>&1; then
         log "ошибка: $cmd не установлен"
         exit 1
@@ -105,7 +104,7 @@ fi
 
 # Получаем объявления по отдельности и проверяем
 log "парсинг объявлений..."
-ADS=$(xpath_parse "${CONTENT}" "${ADS_PATTERN}" | fix_charset)
+ADS=$(xpath_parse "${CONTENT}" "${ADS_PATTERN}")
 if [ -z "${ADS}" ]; then
     log "объявления не найдены: некорректный url, сменилась разметка или что-то ещё :("
     exit 1
@@ -137,7 +136,7 @@ echo "$ADS" | while read -r ad; do
     fi
 
     ID=$(xpath_parse "${ad}" "${IDS_PATTERN}" | get_digits)
-    TITLE=$(xpath_parse "${ad}" "${TITLES_PATTERN}" | fix_charset | html_escape)
+    TITLE=$(xpath_parse "${ad}" "${TITLES_PATTERN}" | html_escape)
     PRICE=$(xpath_parse "${ad}" "${PRICES_PATTERN}" | get_digits)
     PREVIEW=$(xpath_parse "${ad}" "${PREVIEWS_PATTERN}" | sed -n "s/.*472w,\s*\(https[^,]*\)\s*636w.*/\1/p")
 
