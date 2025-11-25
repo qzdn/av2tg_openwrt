@@ -1,3 +1,4 @@
-python/*
+messages.log
+prev_run_ids.txt
+sent_ids.txt
 settings.txt
-page.html
